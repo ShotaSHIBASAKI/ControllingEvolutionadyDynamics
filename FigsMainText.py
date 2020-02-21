@@ -211,7 +211,7 @@ def Fig1_ExampleODE(case):
     plt.savefig(fname)
     plt.show()
 """
-Codes for Figs2B-E
+Codes for Figs2B-E, G-J
 Run Fig2_InvasionState(case,step_size)
 """
 def Newton(x0, T0, r, K, n, alpha):
@@ -284,44 +284,55 @@ def Quad(A, B, C, case):
             return max(tau_p, tau_m)
     else:
         return -1
+def Resident_Invasion(r_res, K_res, r_inv, K_inv, Tin_array, n, resident_coop):
+    """
+    boundaries where resident and invader persist, respectively
+    r_res, K_res: r and K of resident
+    r_inv, K_inv: r and K of invader
+    Tin_array: given values of toxin flowing into the system
+    n: Hill coefficient
+    """
     
+    #boundary 1: resident persists in absence of invader below this boundary
+    boundary1=r_res-dmax*Tin_array**n/(Tin_array**n+K_res**n)
+    
+    #boundary 2: resident is not invaded by invader
+    boundary2=np.ones(np.size(Tin_array))
+    for i in range(np.size(Tin_array)):
+        if resident_coop==0:
+            # resident is not cooperator
+            T_eq=Tin_array[i]
+        else:
+            stab=1
+            while stab==1:
+                # resident is cooperator
+                # obtain toxin concentration when there exist only resident
+                x0=np.random.random()
+                x=Newton(x0, Tin_array[i], r_res, K_res, n, alpha)
+                T_eq=alpha*Tin_array[i]/(alpha+fmax*x/(Kd+x))
+                stab=Stability(x,T_eq, Tin_array[i], r_res, K_res, n, alpha)
+        d_res=dmax*T_eq**n/(T_eq**n+K_res**n)
+        d_inv=dmax*T_eq**n/(T_eq**n+K_inv**n)
+        boundary2[i]=(r_inv*d_res-r_res*d_inv)/(r_res-r_inv)
+        
+        
+        
+    return [boundary1, boundary2]
 def Fig2_InvasionState(case,step_size):
     """
     Case: which phenotype should be a resisdent?
-    Step_size; step size pf di;ution rate and toxin concnetraion
+    Step_size; step size of toxin concnetraion flowing into the system
     
     Classfy the results of invasion analysis according to alpha and T0
-    case0: resident is sCo: invader rCo, rCh (sCh always invade and exclude)
-    case1; resident is rCo: invader sCo, sCh
-    case2: resident is sCh: invader rCo and rCh
-    case3: resident is rCh: invader sCo and sCh
-    Notice 1: if Co can invade, Ch with same level of resistance also can invade
-    Notice 2: when both resident and invader are Cos (or Chs), invasion = exclusion
+    case0: sCo vs rCo
+    case1: sCo vs rCh
+    case2: sCh vs rCo
+    case3: sCh vs rCh
     
-    CLASSES of state space
-    if Co is resident (else if Ch is resident, exchange Co with Ch, respectively)  
-    class0 white: no resident cell exists
-    class1 navy: Co can invade and exclude. Ch invades and then, can exclude and coexist
-    class2 blue: Co can invade and exclude. Ch invades and then, can only exclude 
-    class3 grayblue: Co can invade and exclude. Ch invades and then, can only coexist 
-    class4 skyblue: Co can invade and exclude. Ch invades but has not stable equilibria 
-    class5 cyan: Co can invade and exclude. Ch cannot invade
-    class6 dark green: Co can invade but cannot exclude. Ch invades and then, can exclude and coexist
-    class7 green: Co can invade but cannot exclude. Ch invades and then, can only exclude 
-    class8 lightgreen: Co can invade but cannot exclude. Ch invades and then, can only coexist 
-    class9 yellowgreen: Co can invade but cannot exclude. Ch invades but has not stable equilibria
-    class10 yellow: Co can invade and exclude. Ch cannot invade
-    class11 darkred: Co cannot invade. Ch invades and then, can exclude and coexist
-    class12 red: Co cannot invade. Ch invades and then, can only exclude 
-    class13 orange: Co cannot invade. Ch invades and then, can only coexist 
-    class14 pink: Co cannot invade. Ch invades but has not stable equilibria 
-    class15 magenta: Co can invade and exclude. Ch cannot invade
-    class16 black: resident is never invaded 
+    Note: sCo vs sCh (or rCo vs rCh) is obvious
     """
     #set array of alpha and Tin, and x (init for Newton method)
-    alpha_array=np.linspace(1/step_size,1,step_size)
-    Tin_array=np.linspace(1/step_size,1,step_size)
-    x0_array=np.linspace(0,1,Newton_size)#array for Newton method
+    Tin_array=np.linspace(0,1,step_size+1)  
     #define parameter values
     r=rmax#maximum growth rate
     cd=0.15#cost of detofication
@@ -329,260 +340,94 @@ def Fig2_InvasionState(case,step_size):
     Ks=0.3#median toxin concentration for sensitive
     Kr=0.6#for resistant
     n=3#Hill coeeficient
-    Class=np.zeros([step_size, step_size])
-    if case==0:
+    
+    #sensitive strain
+    if case==0 or case==1:
         #sCo
         r1=r*(1-cd)
         K1=Ks
-        title="sCo"
-        st_resident=1#resident is cooperator
-    elif case==1:
-        #rCo
-        r1=r*(1-cd-cr)
-        K1=Kr
-        title="rCo"
-        st_resident=1
-    elif case==2:
+        resident_coop1=1
+    else:
         #sCh
         r1=r*1
         K1=Ks
-        title="sCh"
-        st_resident=0#resident is cheater
-    elif case==3:
-        #rCh
-        r1=r*(1-cr)
-        K1=Kr
-        title="rCh"
-        st_resident=0
+        resident_coop1=0
+    if case==0 or case==2:
+       #rCo
+        r2=r*(1-cd-cr)
+        K2=Kr
+        resident_coop2=1
     else:
-        print("Error: case should be 0, 1, 2, or 3")
-        return 1
-    for i in range (np.size(alpha_array)):
-        alpha=alpha_array[i]
-        for j in range(np.size(Tin_array)):
-            Tin=Tin_array[j]
-            #check whether the resident can survive in mono-culture
-            W0=r1/(alpha+dmax*Tin**n/(Tin**n+K1**n))
-            flag1=0#1:invader 1 can invade  and
-            #1 exclusion 2 cannot exclude (oscillation or chaos)
-            flag2=0#invader 2 can invade and
-            #1: exlude and coexist, 2:only exclude 3:only coexist 4: no stable
-            flag2_exclude=0
-            flag2_coexist=0
-            Classify=0
-            if W0<1:
-                #the resident cannot exist
-                Class[i,j]=0#no resident
-            else:
-                #consider the invasion analysis
-                if st_resident==0:
-                    #T* = Tin if residetn is cheater
-                    T_equil1=Tin
-                else: 
-                    #calculate equilibrium for resident by Newron method
-                    T_equil1=1
-                    for k in range (Newton_size):
-                        x0=x0_array[k]
-                        x=Newton(x0, Tin, r1, K1, n, alpha,)
-                        if x>0:
-                            #print(x)
-                            T=alpha*Tin/(alpha+fmax*x/(Kd+x))
-                            stab=Stability(x,T, Tin, r1, K1, n, alpha)
-                            if stab==0:
-                                #print('stable')
-                                #linearly stable
-                                if T_equil1>T:
-                                    #current T is lower than the current T_equil.find lowest T_equib
-                                    T_equil1=T
-                Wr1=r1/(alpha+dmax*T_equil1**n/(T_equil1**n+K1**n))#relative fitness of resident at T*_resident
-                
-                #invasion analysis 1: with same st for detoxification but diff resistance
-                if case==0:
-                    #vs rCo
-                    r2=r*(1-cr-cd)
-                    K2=Kr
-                elif case==1:
-                    #vs sCo
-                    r2=r*(1-cd)
-                    K2=Ks
-                elif case==2:
-                    #vs rCh
-                    r2=r*(1-cr)
-                    K2=Kr
-                else:
-                    #vs sCh
-                    r2=r
-                    K2=Ks
-                st_inv1=st_resident
-                Wi1=r2/(alpha+dmax*T_equil1**n/(T_equil1**n+K2**n))#relative fitness of invader1  at T*_resident
-                if Wr1<Wi1:
-                    #invasion succeeds
-                    #check whther invader excludes the resident or not by comparing relative fitness
-                    if st_inv1==0:
-                        T_equil2=Tin
-                    else: 
-                        #at the equilibrium where only invader exist
-                        T_equil2=1
-                        for k in range (Newton_size):
-                            x0=x0_array[k]
-                            x=Newton(x0, Tin, r2, K2, n, alpha)
-                            if x>0:
-                                T=alpha*Tin/(alpha+fmax*x/(Kd+x))
-                                stab=Stability(x,T, Tin, r2, K2, n, alpha)
-                                if stab==0:
-                                    #linearly stable
-                                    if T_equil2>T:
-                                        #current T is lower than the current T_equil.find lowest T_equib
-                                        T_equil2=T
-                    Wr2=r1/(alpha+dmax*T_equil2**n/(T_equil2**n+K1**n))#relative fitness of resident at T*_invader1
-                    Wi2=r2/(alpha+dmax*T_equil2**n/(T_equil2**n+K2**n))#relative fitness of invader1 at T*_invader1
-                    if Wr2<Wi2:
-                        #invasion and exclusion 
-                        flag1=1
-                    else:
-                        #invade but unable to exclude; oscillation or chaos?
-                        flag1=2
-                else:
-                    flag1=0#unable to invade
-                
-                #invasion analysis2 with diff st for detoxification and diff resistance
-                if case==0:
-                    #vs rCh
-                    c1=cd#cost for sCo
-                    c2=cr#cost for rCh
-                    r2=r*(1-c2)
-                    K2=Kr
-                    st_inv2=0#invader2 is cheater
-                elif case==1:
-                    #vs sCh
-                    c1=cd+cr#cost for rCo
-                    c2=0#cost for sCh
-                    r2=r*(1-c2)
-                    K2=Ks
-                    st_inv2=0
-                elif case==2:
-                    #vs rCo
-                    c1=0#cost for sCh
-                    c2=cr+cd#cost for rCo
-                    r2=r*(1-c2)
-                    K2=Kr
-                    st_inv2=1#invader2 is cooperator
-                else:
-                    #vs sCo
-                    c1=cr#cost for rCh
-                    c2=cd#cost for sCo
-                    r2=r*(1-c2)
-                    K2=Ks
-                    st_inv2=1
-                Wi1=r2/(alpha+dmax*T_equil1**n/(T_equil1**n+K2**n))#relative fitness of invader 2 at T*_resident
-                if Wr1<Wi1:
-                    #invasion succeed
-                    flag2=1
-                    #check exclusion
-                    if st_inv2==0:
-                        T_equil2=Tin
-                    else:
-                        #Newton method
-                        T_equil2=1
-                        for k in range (Newton_size):
-                            x0=x0_array[k]
-                            x=Newton(x0, Tin, r2, K2, n, alpha)
-                            if x>0:
-                                T=alpha*Tin/(alpha+fmax*x/(Kd+x))
-                                stab=Stability(x,T, Tin, r2, K2, n, alpha)
-                                if stab==0:
-                                    #linearly stable
-                                    if T_equil2>T:
-                                        #current T is lower than the current T_equil.find lowest T_equib
-                                        T_equil2=T                            
-                    Wr2=r1/(alpha+dmax*T_equil2**n/(T_equil2**n+K1**n))#relative fitness of resident at T*_invader2
-                    Wi2=r2/(alpha+dmax*T_equil2**n/(T_equil2**n+K2**n))#relative fitness of invader2 at T*_invader2
-                    if Wr2<Wi2:
-                        #exclusion
-                        flag2_exclude=1#exclude
-                    #check the coexistence
-                    #calculate equilibrium
-                    A=(dmax+alpha)*(c2-c1)
-                    B=dmax*(1-c1)*K1**n-dmax*(1-c2)*K2**n+alpha*(c2-c1)*(K1**n+K2**n)
-                    C=alpha*(c2-c1)*K1**n*K2**n
-                    if case==0 or case==3:
-                        case_quad=1#convex
-                    else:
-                        case_quad=0#concave
-                    tau_d=Quad(A,B,C,case_quad)#Tau at the coexistence
-                    T_d=tau_d**(1/n)
-                    x_co_d=alpha*Kd*(Tin-T_d)/(fmax*T_d-alpha*(Tin-T_d))#density og coperator
-                    x_ch_d=1-x_co_d-(dmax*T_d**n/(T_d**n+K2**n)+alpha)/r2#density of cheater
-                    #check the stability of this equilibrium
-                    if case==0 or case==1:
-                        #sCo vs rCh or rCo vs sCh: st1 is cooperator
-                        stab=Stability2(x_co_d, x_ch_d, T_d, Tin, r1, r2, K1, n, alpha)
-                    else:
-                        #st2 is cooperator
-                        stab=Stability2(x_co_d, x_ch_d, T_d, Tin, r2, r1, K2, n, alpha)
-                    if stab==0 and x_ch_d>0 and x_co_d<1:
-                        flag2_coexist=1#stable coexistence
-                    
-                else:
-                    flag2=0#unable to invade
-                    flag2_exclude=-1
-                    flag2_coexist=-1
-                #classification
-                if flag1==0 and flag2==0:
-                    Class[i,j]=16
-                else:
-                    #according to Co
-                    if flag1==1:
-                        Classify=0#exclude
-                    elif flag1==2:
-                        Classify=1 #oscilate or complex
-                    else:
-                        Classify=2 #not invade
-                    #according to Ch
-                    if flag2==0:
-                        #cannot invade
-                        Class[i,j]=Classify*5+5
-                    else:
-                        #invaded
-                        if flag2_exclude==1 and flag2_coexist==1:
-                            #both exclude and coexist
-                            Class[i,j]=Classify*5+1
-                        elif flag2_exclude==1 and flag2_coexist==0:
-                            #only exclusion
-                            Class[i,j]=Classify*5+2
-                        elif flag2_exclude==0 and flag2_coexist==1:
-                            #only coexist
-                            Class[i,j]=Classify*5+3
-                        elif flag2_exclude==0 and flag2_coexist==0:
-                            #no stable equilibria
-                            Class[i,j]=Classify*5+4
-    #plot the results
-    #define heatmap
-    cmap = colors.ListedColormap(['white', 'navy', 'blue', 'royalblue', 'skyblue','cyan',
-                                  'darkgreen', 'green', 'lightgreen', 'greenyellow','yellow',
-                                  'darkred', 'red', 'orangered', 'pink', 'magenta','black'])
-    bounds=[-0.5, 0.5, 1.5 , 2.5 , 3.5 , 4.5 , 5.5 , 6.5 , 7.5 , 8.5, 9.5, 10.5, 11.5, 12.5, 13.5, 14.5, 15.5, 16.5]
-    #bounds=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-    norm = colors.BoundaryNorm(bounds, cmap.N)
-    fig, ax = plt.subplots(figsize=(6,5))
-    heatmap = ax.pcolor(Class, cmap=cmap, norm=norm)
-    #heatmap = ax.pcolor(Class, cmap=plt.cm.tab20c)
-    ax.xaxis.tick_bottom()
-    xlocs=np.array([0,step_size/2-0.5, step_size-0.5])
-    xticks=np.array([0.0, 0.5, 1.0])
-    plt.xticks(xlocs,xticks)
-    ylocs=np.array([0,step_size/2-0.5, step_size-0.5])
-    yticks=np.array([0.0, 0.5,1.0])
-    plt.yticks(ylocs,yticks)
-    cb_ticks=[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
-    plt.colorbar(heatmap,ticks=cb_ticks)
-    plt.xlabel(r'$T_{in}$',fontsize=14)
-    plt.ylabel(r'$\alpha$',fontsize=14)
-    plt.title(title, fontsize=14)
-    plt.savefig(title+'state-space.pdf')
-    plt.show()
-    np.savetxt(title+'state-space.csv', Class, fmt='%d', delimiter=',')
+        #rCh
+        r2=r*(1-cr)
+        K2=Kr
+        resident_coop2=0
+        
+        
+    if case==0:
+        tname1='sCo → rCo'
+        tname2='rCo → sCo'
+        gname1='StateSpace_sCo-rCo.pdf'
+        gname2='StateSpace_rCo-sCo.pdf'
+    elif case==1:
+        tname1='sCo → rCh'
+        tname2='rCh → sCo'
+        gname1='StateSpace_sCo-rCh.pdf'
+        gname2='StateSpace_rCh-sCo.pdf'
+    elif case==2:
+        tname1='sCh → rCo'
+        tname2='rCo → sCh'
+        gname1='StateSpace_sCh-rCo.pdf'
+        gname2='StateSpace_rCo-sCh.pdf'
+    else:
+        tname1='sCh → rCh'
+        tname2='rCh → sCh'
+        gname1='StateSpace_sCh-rCh.pdf'
+        gname2='StateSpace_rCh-sCh.pdf'
+         
+    # simulation one: sensitive strain is resident and resistant strain is invader
+    [boundary11, boundary12]=Resident_Invasion(r1, K1, r2, K2, 
+    Tin_array, n, resident_coop1)
     
+    # simulation two: resistnat strain is resident and sensitive strain is invader
+    [boundary21, boundary22]=Resident_Invasion(r2, K2, r1, K1, 
+    Tin_array, n, resident_coop2)
+     
+    plt.subplots(figsize=(6,6))
+    plt.plot(Tin_array, boundary11, color='k', linestyle='-')
+    plt.plot(Tin_array, boundary12, color='k', linestyle='--')
+    Min=np.array([boundary11, boundary12])
+    plt.fill_between(Tin_array, np.amin(Min, axis=0),0, color=(0.984375  , 0.55078125, 0.3828125), alpha=1.0) #invasion succed
+    plt.fill_between(Tin_array, boundary11, boundary12, 
+                     where=boundary11>boundary12, color=(0.99609375, 0.84765625, 0.18359375), alpha=1.0) #invasion fail
+    plt.xlim(0, 1.0)
+    plt.ylim(0, 1.0)
+    ticks=np.array([0.0, 0.5, 1.0])
+    locs=np.array([0.0, 0.5, 1.0])
+    plt.yticks(locs,ticks, fontsize=18)
+    plt.xticks(locs,ticks, fontsize=18)
+    #plt.text(0.5, 0.9, tname1, fontsize=28)
+    plt.savefig(gname1,bbox_inches='tight', pad_inches=0.1)
+    plt.show()
+    
+    Min=np.array([boundary21, boundary22])
+    plt.subplots(figsize=(6,6))
+    plt.plot(Tin_array, boundary21, color='k', linestyle='-')
+    plt.plot(Tin_array, boundary22, color='k', linestyle='--')
+    plt.fill_between(Tin_array, boundary21, boundary22,
+                     where=boundary21>boundary22, color=(0.984375  , 0.55078125, 0.3828125), alpha=1.0) #invasion succeed
+    plt.fill_between(Tin_array, np.amin(Min, axis=0),0, color=(0.99609375, 0.84765625, 0.18359375), alpha=1.0) # invasion fails
+    plt.xlim(0, 1.0)
+    plt.ylim(0, 1.0)
+    ticks=np.array([0.0, 0.5, 1.0])
+    locs=np.array([0.0, 0.5, 1.0])
+    plt.yticks(locs,ticks, fontsize=18)
+    plt.xticks(locs,ticks, fontsize=18)
+    #plt.text(0.5, 0.9, tname2, fontsize=28)
+    plt.savefig(gname2,bbox_inches='tight', pad_inches=0.1)
+    plt.show()
+    
+
 """
 Fig 4
 Run Fig4_OptMultiPlot(cd, cr, Ks, Kr, ns, nr)
