@@ -11,7 +11,7 @@ For analysis of Markov chian models in Figs. 5B (ergodic one) or A.11A (non-ergo
 This code drows Fig. A.1(the phase plain analysis) when there exist only one strategy in a chemostat.
 
 ## Appendix2.py
-This codes shows the calcualtions in section A.2 (invasion analysis), and drows Figs.2 and 3.
+This codes shows the calcualtions in section A.2 (invasion analysis), and drows Figs.A2 and A3.
 
 ## Appendix3.py
 This codes analyzes the 3x3 Jacobian matrices in section A.3 (linear stability of equilibria), and drows Figs. A6 (evolutionary dynamics when two species exist), and A7 (Monte Calro simulation). The summary of the results of Monte Carlo simulation is available in "parameter_sweep_total_case0.csv" (rCo and sCh) or "parameter_sweep_total_case1.csv" (sCo and rCh). The raw data is available on request (as the file sizes are too large).
